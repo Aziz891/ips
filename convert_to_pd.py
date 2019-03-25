@@ -2,8 +2,7 @@
 import pandas as pd 
 import numpy as np 
 import tensorflow as ts 
-import re
-import csv
+import re, csv, pickle
 
 
 
@@ -20,11 +19,11 @@ x = pd.read_csv('D:/IPS_dumps/data_corrected.csv', delimiter=';',  parse_dates=[
 count =0
 for index,chunck in enumerate(x):
     print('chunck # ' + str(index))
+    with open('D:/IPS_dumps/data_corrected{}.pkl'.format(count), 'wb') as out:
+            pickle.dump(chunck, out)
     count += 1
-    print
-    if count >2:
-        break
+
+
 
 
 print('count of chuncks is ' + str(count))
-print(chunck)
