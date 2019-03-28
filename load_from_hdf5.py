@@ -1,39 +1,47 @@
 import pandas as pd
-import time
+import time, pickle
 import numpy as np
 
 
+
+
+with open('relay_models.pkl', 'rb') as f:
+    relay_models = pickle.load(f)
+
+
 class Relay():
-    def __init__(self, model_id):
-        self.model_id = model_id
+    def __init__(self, model):
+        self.model_relay = model['id']
+        self.elements = model['elements']
 
-class Element(Relay):
+    def filter_all(self):
+        temp = []
+        for key, value in self.elements.items():
+            temp = temp + value
+        temp =list(map(lambda x : 'XRioID =' + x , temp))
+        return ' | '.join(temp) 
 
-    def __init__(self, model_id, parameters_to_filter):
-        super().__init__(model_id)
-        self.parameters_to_filter = parameters_to_filter
-
-    def filter(self, pdframe, column, pdfunction):
-        temp =  pdfunction(pdframe[column], self.parameters_to_filter)
-        return temp
-
-listXRIO = ['A8999C9F_A43A_466A_8790_A6715F5148D7', 'B206956F_DCA9_44AA_AE78_9227E00F84BA', 'DAE53492_94C8_4AE2_8CF6_45AADCC0A570', 'CE34671E_D55D_4EE0_82C9_35B3F3E607B1', 'A8999C9F_A43A_466A_8790_A6715F5148D7', 
-
-'E0F117E4_D2A2_4643_9FA0_B96DD79C8863', 'DD1AA4A0_9D86_454C_ACF6_A2DDA29B4F90']
-
-x =list(map(lambda x : 'XRioID =' + x , listXRIO))
-where_clause =  ' | '.join(x) 
+    def calculate_reach(self, zone_settings):
+        z1 = float(zone_settings['Actual'][zone_settings['XRioID'].isin(self.elements['z1'])].iloc[0])
+        zline = float(zone_settings['Actual'][zone_settings['XRioID'].isin(self.elements['line_impedance'])].iloc[0])
+        return zline * z1 / 100
 
 
-p546 = Element('p546',['A8999C9F_A43A_466A_8790_A6715F5148D7', 'B206956F_DCA9_44AA_AE78_9227E00F84BA', 'DAE53492_94C8_4AE2_8CF6_45AADCC0A570', 'CE34671E_D55D_4EE0_82C9_35B3F3E607B1', 'A8999C9F_A43A_466A_8790_A6715F5148D7', 
 
-'E0F117E4_D2A2_4643_9FA0_B96DD79C8863', 'DD1AA4A0_9D86_454C_ACF6_A2DDA29B4F90'])
-
-
-print()
+p546 = Relay(relay_models['p546'])
+where_clause = p546.filter_all()
+reaches = []
 
 ips = pd.read_hdf('D:/IPS_dumps/ips.h5', where= where_clause)
-print(ips)
+for i in ips['AssetID'].unique():
+    filter_settings = ips[ips['AssetID'] == i]
+    if  len(filter_settings.index) == 4:
+        reach = p546.calculate_reach(filter_settings)
+        reaches += [reach]
+
+reaches = pd.Series(reaches)
+
+
 
 
 
