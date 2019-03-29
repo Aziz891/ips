@@ -16,10 +16,15 @@ class Relay():
 
     def filter_all(self):
         temp = []
-        for key, value in self.elements.items():
+        for _ , value in self.elements.items():
             temp = temp + value
         temp =list(map(lambda x : 'XRioID =' + x , temp))
         return ' | '.join(temp) 
+
+class P546(Relay):
+
+    def __init__(self, model):
+        super().__init__(model)
 
     def calculate_reach(self, zone_settings):
         z1 = float(zone_settings['Actual'][zone_settings['XRioID'].isin(self.elements['z1'])].iloc[0])
@@ -27,17 +32,18 @@ class Relay():
         return zline * z1 / 100
 
 
+p546 = P546(relay_models['P546'])
 
-p546 = Relay(relay_models['p546'])
-where_clause = p546.filter_all()
 reaches = []
-
-ips = pd.read_hdf('D:/IPS_dumps/ips.h5', where= where_clause)
+ips = pd.read_hdf('D:/IPS_dumps/ips.h5', where=  p546.filter_all() )
 for i in ips['AssetID'].unique():
     filter_settings = ips[ips['AssetID'] == i]
-    if  len(filter_settings.index) == 4:
-        reach = p546.calculate_reach(filter_settings)
-        reaches += [reach]
+    if  len(filter_settings.index) > 0:
+        print
+        # reach = p546.calculate_reach(filter_settings)
+        # reaches += [reach]
+    else:
+        print()
 
 reaches = pd.Series(reaches)
 

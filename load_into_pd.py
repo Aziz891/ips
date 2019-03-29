@@ -5,11 +5,11 @@ import tensorflow as ts
 import re, csv, pickle, time
 
 tim1 = time.perf_counter()
-location_data = pd.read_csv('D:\IPS_dumps\location_data.csv', delimiter=';', skiprows=[1], encoding='mbcs')
+location_data = pd.read_csv('D:/IPS_dumps/location_data.csv', delimiter=';', skiprows=[1], encoding='mbcs')
 filter_frame = pd.DataFrame()
 for index in range(26):
     t1 = time.perf_counter()
-    with open('D:\IPS_dumps\data_corrected{}.pkl'.format(index), 'rb') as file_in:
+    with open('D:/IPS_dumps/data_corrected{}.pkl'.format(index), 'rb') as file_in:
         ips = pickle.load(file_in)
     print(time.perf_counter() - t1)
     setting_filter = ips['XRioID'].isin(['A8999C9F_A43A_466A_8790_A6715F5148D7', 'B206956F_DCA9_44AA_AE78_9227E00F84BA', 'DAE53492_94C8_4AE2_8CF6_45AADCC0A570', 'CE34671E_D55D_4EE0_82C9_35B3F3E607B1', 'A8999C9F_A43A_466A_8790_A6715F5148D7', 
@@ -20,7 +20,9 @@ for index in range(26):
 filter_frame = filter_frame[['AssetID', 'Actual']].join(location_data.set_index('AssetID'), on='AssetID')
 filter_frame= filter_frame[filter_frame['Actual'].astype(float) > 200]
 print(filter_frame)
-print(time.perf_counter() - tim1)
+print(time.perf_counter() - tim1) 
+
+
 
 
 
