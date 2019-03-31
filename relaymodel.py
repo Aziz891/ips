@@ -1,6 +1,6 @@
 from collections import defaultdict
 import pickle
-
+import pandas as pd
 relay_models = defaultdict(lambda : None)
 
 relay_models['P546'] = {
@@ -74,7 +74,7 @@ relay_models['P546'] = {
 'DF8583DF_D5FC_4680_BFF2_D3EF939F29AA'
 
 
-  
+
 ],
 
 'z1_percentage' : [
@@ -97,14 +97,20 @@ relay_models['P546'] = {
 'line_angle' : [
     
 'EB34D292_423F_47CE_A0A2_89C5988D9C29', 'F0A57AD5_846F_4272_A67D_E40665625767', 
-'F5914D31_348F_4303_86C9_F242A54BC59B', 'DA6F8892_A72A_490E_AD22_C1309CC503AD'] # incomplete
+'F5914D31_348F_4303_86C9_F242A54BC59B', 'DA6F8892_A72A_490E_AD22_C1309CC503AD',
+'B752AC1C_9838_45A2_B3F6_F2E31C43B092' , 'F9299E2D_2630_4F4F_A278_03E046194620'
+] 
 
 
- }
- }
+}
+}
 relay_models= dict(relay_models)
 
 with open('relay_models.pkl', 'wb') as f:
     pickle.dump(relay_models, f)  
 
-    
+location_data = pd.read_csv('D:/IPS_dumps/location_data.csv', delimiter=';', skiprows=[1], encoding='mbcs')
+location_data =  location_data.set_index('AssetID')
+
+with open('location_data.pkl', 'wb') as f:
+    pickle.dump(location_data, f)  

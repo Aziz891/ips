@@ -5,3 +5,4 @@ enum_values.csv
 scratch.py
 relay_models.pkl
 enum_dict.pkl
+*.pkl
