@@ -117,9 +117,13 @@ location_data = pd.read_csv('D:/IPS_dumps/location_data.csv', delimiter=';', ski
 location_data =  location_data.set_index('AssetID')
 assets = assets.join(location_data, on='AssetID')
 assets = assets[['Location', 'AssetID', 'z1', 'line_impedance', 'flags' ] ]
+assets.set_index(['Location', 'AssetID'], inplace=True)
+
 
 
 
 assets.to_csv('D:/IPS_dumps/output.csv')
+assets.sort_index(inplace=True)
 t2 = time.perf_counter() - t1
+
 
