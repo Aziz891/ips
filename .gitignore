@@ -8,4 +8,5 @@ enum_dict.pkl
 *.pkl
 IPS_MODELS
 __pycache__/
+test2.csv
 
