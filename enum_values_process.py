@@ -7,7 +7,7 @@ enum_dict = defaultdict(lambda: None)
 
 
 
-with open('C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\enum_values.csv', 'r') as f:
+with open('D:\IPS_dumps\enum_values.csv', 'r') as f:
     reader = csv.reader(f, delimiter=';')
 
     for row in reader:
