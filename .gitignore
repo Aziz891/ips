@@ -9,4 +9,7 @@ enum_dict.pkl
 IPS_MODELS
 __pycache__/
 test2.csv
+output.csv
+.idea/
+
 

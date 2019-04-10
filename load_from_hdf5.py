@@ -55,7 +55,40 @@ class Parser():
 
         temp = list(map(lambda x: 'RelParPatternID =' + '\'' + x + '\'', self.p546_patterns))
         return ' | '.join(temp)
+    def parse_location(self, dataframe):
+        '''
+        ['Location','AssetID', 'Has no relays', 'relay has missing PSD','relay has no settings',  'latest setting not Active',  'setting has no parameters']
+         '''
+        flags = [None, None, None, None, None]
+        if  dataframe.empty:
+            flags[0] = True
+        else:
 
+            ctvt = psd[psd['AssetID'] == dataframe['AssetID'].iloc[0]]
+            if len(ctvt.index) < 2:
+                flags[1] = True
+
+
+
+            if len(dataframe.index) == 1:
+                if dataframe['RelaySettingID'].isnull().any().any():
+                    flags[2] = True
+                else:
+                    if dataframe['Active'].iloc[0] != 1:
+                        flags[3] = True
+
+                    if dataframe['XRioID'].isnull().any().any() :
+                        flags[4] = True
+
+            else:
+
+                if dataframe['Active'].iloc[0] != 1:
+                    flags[3] = True
+
+
+
+
+        return [True, *flags]
 
 
 class Pattern():
@@ -199,13 +232,17 @@ class Pattern():
 
 locations_type = ['58EA705D-BE4D-4520-89C3-312DF1ADF48D', '3CF34EF0-1BA7-4FA5-B62B-5EF77C787428',
                   'CD2E75F4-A0F3-433A-9B87-64BC516AB566']
-regex = re.compile('380|230|115|132|110')
-location_data = pd.read_csv("D:\IPS_dumps\locations_data_new.csv", delimiter=';', skiprows=[1], encoding='mbcs')
-location_data = location_data[(location_data['LocationTypeID'].isin(locations_type)) & (
-    location_data['NameENU'].apply(lambda x: True if regex.match(str(x)) else False))]
+excluded_types = [ 'D3752375-D674-446D-ADD8-DFC81C0514B3', '3D79BABE-EB5B-4DF3-9025-F6A3FBB7DA84', '2FD122B5-C47E-415C-8D1E-789BB7CF2331',
+                   'AF2580E1-3D27-4F2B-B9C8-EDFAFC4E8E7F', 'A8CE7184-1C9D-49E3-AFFB-17486F0E74F6', 'AD0A13AB-61DE-4FBF-8ECB-24058170A17A', 'CBAFC824-9235-445C-8A3C-EB9D2D2EFCEB', '7B2E75C3-F0E0-4AB2-A2D9-AC0D84DE3B1A']
+regex = re.compile('NG|CENTRAL|EAST|SOUTH|WEST')
+location_data = pd.read_csv("C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\locations_data_new.csv", delimiter=';', skiprows=[1, 7237, 181433, 193733, 194016, 194017, 194029, 194035, 194044, 194278, 202498, 202511], encoding='mbcs')
+location_data = location_data[(~location_data['LocationTypeID'].isin(excluded_types)) & (
+    location_data['Location'].apply(lambda x: True if regex.match(str(x)) else False))]
 location_data.set_index(['Location', 'AssetID'], inplace=True)
 location_data.sort_index(inplace=True)
 
+psd = pd.read_csv("C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\psd.csv", delimiter=';', encoding='mbcs')
+test = psd['PhysicalValueTypeID'].unique()
 reaches = []
 line_impedances = []
 flagses = []
@@ -216,40 +253,40 @@ parser = Parser(relay_patterns)
 count = 0
 results = []
 result_pd = pd.DataFrame()
-pd_iterator = location_data.iterrows()
+# pd_iterator = location_data.iterrows()
 
-for i in grouper(31, pd_iterator):
+for i in location_data.iterrows():
     t1 = time.perf_counter()
 
-    search_string =  pd.Series( asset_concat(i))
 
+    search_string = str(i[0][1])
 
-    ips_group = pd.read_hdf("D:\IPS_dumps\ips_with_path.h5", where= ' AssetID = search_string')
+    ips = pd.read_hdf("C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\ips_with_path.h5", where=' AssetID=search_string')
     print(count,time.perf_counter() - t1)
     t1 = time.perf_counter()
-    ips_group.loc[:, ['Actual']] = ips_group['Actual'].map(lambda x: enum_dict.get(x, x))
-    for j in i:
-        if j is None:
-            continue
-        ips = ips_group[ips_group['AssetID'] == j[0][1]]
-        temp = [*parser.parse(ips)]
+    ips.loc[:, ['Actual']] = ips['Actual'].map(lambda x: enum_dict.get(x, x))
 
-        #
-        # if result[2] is not np.nan:
-        #     result_pd = result_pd.append([result], ignore_index=True)
-        if temp[0]:
-            result = [j[0][0], j[0][1], *temp[1:4], temp[2]/ temp[3] *100, temp[4] ]
-            result_pd = result_pd.append([result], ignore_index=True)
+    temp = [*parser.parse_location(ips)]
+
+
+    #
+    # if result[2] is not np.nan:
+    #     result_pd = result_pd.append([result], ignore_index=True)
+    if temp[0]:
+        # result = [j[0][0], j[0][1], *temp[1:4], temp[2]/ temp[3] *100, temp[4] ]
+        result = [i[0][0], i[0][1], *temp[1:]]
+        result_pd = result_pd.append([result], ignore_index=True)
 
 
         count += 1
 
-        # if count == 500:
-        #     break
+        if count == 500:
+            break
 
-result_pd.columns = ['Location', 'AssetID', 'relay', 'Z1', 'line Impedance', 'reach' , 'Flags']
-result_pd.set_index(['Location', 'AssetID'])
+result_pd.columns = ['Location','AssetID', 'Has no relays', 'relay has missing PSD','relay has no settings',  'latest setting not Active',  'setting has no parameters']
+result_pd.set_index(['Location'])
 result_pd.sort_index(inplace=True)
+
 result_pd.to_csv('output.csv', index=False)
 
 # assets['z1'] = pd.Series(reaches, index=assets.index)
