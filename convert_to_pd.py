@@ -12,7 +12,7 @@ import re, csv, pickle
 
 
 
-x = pd.read_csv('D:/IPS_dumps/settings_corrected.csv', delimiter=';',  quoting=csv.QUOTE_NONE, parse_dates=[4], skiprows=[1,2], encoding='mbcs', chunksize=3000000)
+x = pd.read_csv('D:/IPS_dumps/settings_corrected.csv', delimiter=';',  quoting=csv.QUOTE_NONE, parse_dates=[4], skiprows=[1,2], encoding='mbcs', chunksize=5000000)
 count =0
 for chunck in x:
     # # if count == 2:

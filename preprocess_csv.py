@@ -18,8 +18,6 @@ with open('D:/IPS_dumps/settings.csv', 'r', encoding='mbcs') as f, open('D:/IPS_
             corrected_string = ','.join(split_string[6:])
             whole_string = ';'.join((*split_string[:6], corrected_string))
             out.write((whole_string + '\r\n'))
-            count += 1
-            print(count)
         else:
             out.write((line))
 

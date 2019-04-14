@@ -15,7 +15,9 @@ relay_patterns = {'p546': list(
                               'dcfbb6ac-3dc5-4bdc-aa0a-06e5397819e5'])),
                   'red670': list(map(lambda x: x.upper(),
                                      ['6d8efa16-a0c3-44fc-b1c4-aecf3351eff2', '62f796dd-e4e9-4dd3-b9b1-e11e9b449759'
-                                                                              'd3165fb1-91c3-49e0-b74f-89b96e3dabb1']))
+                                                                              'd3165fb1-91c3-49e0-b74f-89b96e3dabb1'])),
+        '7sd522' : {'779C87B1-6469-40B8-A514-6D47CFDC550F', '9A12628E-31C8-486C-91C0-B8774F22A5EA',
+                    '1700E526-EAA3-4C14-B992-632EE4CD104A'}
                   }
 
 def grouper(n, iterable, fillvalue=None):
@@ -36,10 +38,11 @@ class Parser():
     def __init__(self, dictionary):
         self.p546_patterns = dictionary['p546']
         self.red670_patterns = dictionary['red670']
+        self.s7sd522_paterns = dictionary['7sd522']
 
     def parse(self, dataframe):
         if dataframe.empty:
-            return False, np.nan, np.nan, np.nan
+            return False, np.nan, np.nan, np.nan, np.nan
 
         if dataframe['RelParPatternID'].iloc[0] in self.p546_patterns:
             reach, line_impedance, flags = Pattern().p546_calculate_elements(dataframe)
@@ -47,43 +50,54 @@ class Parser():
         elif dataframe['RelParPatternID'].iloc[0] in self.red670_patterns:
             reach, line_impedance, flags = Pattern().red670_calculate_elements(dataframe)
             return True, 'RED670' , reach, line_impedance, flags
+        elif dataframe['RelParPatternID'].iloc[0] in self.s7sd522_paterns:
+            reach, line_impedance, flags = Pattern().s7sd522_calculate_elements(dataframe)
+            return True, '7SD522', reach, line_impedance, flags
+
 
         else:
-            return False, np.nan, np.nan, np.nan
+            return False, np.nan, np.nan, np.nan, np.nan
 
     def hdf5_string(self):
 
         temp = list(map(lambda x: 'RelParPatternID =' + '\'' + x + '\'', self.p546_patterns))
         return ' | '.join(temp)
-    def parse_location(self, dataframe):
+    def parse_location(self, dataframe, location_type, parent_location_type):
         '''
-        ['Location','AssetID', 'Has no relays', 'relay has missing PSD','relay has no settings',  'latest setting not Active',  'setting has no parameters']
+        ['Location','Asset Name', 'Relay type', 'Technology', 'Location has no relays', 'Relay placed in incorrect location', 'Relay has missing PSD','Relay has no settings',
+        'latest setting not Active',  'Setting has no parameters']
          '''
-        flags = [None, None, None, None, None]
+        flags = [None, None, None, None, None, None]
         if  dataframe.empty:
-            flags[0] = True
+            if locations_type not in excluded_types:
+                flags[0] = True
         else:
+
+            if locations_type in excluded_types:
+                flags[1] = True
+            if parent_location_type == excluded_types[0]:
+                flags[1] = True
 
             ctvt = psd[psd['AssetID'] == dataframe['AssetID'].iloc[0]]
             if len(ctvt.index) < 2:
-                flags[1] = True
+                flags[2] = True
 
 
 
             if len(dataframe.index) == 1:
                 if dataframe['RelaySettingID'].isnull().any().any():
-                    flags[2] = True
+                    flags[3] = True
                 else:
                     if dataframe['Active'].iloc[0] != 1:
-                        flags[3] = True
+                        flags[4] = True
 
                     if dataframe['XRioID'].isnull().any().any() :
-                        flags[4] = True
+                        flags[5] = True
 
             else:
 
                 if dataframe['Active'].iloc[0] != 1:
-                    flags[3] = True
+                    flags[4] = True
 
 
 
@@ -128,7 +142,7 @@ class Pattern():
         else:
             ct_secondary = float(ct_secondary.iloc[0])
 
-        impedance_factor = (vt_primary / vt_secondary) / (ct_primary / ct_secondary)
+        impedance_factor = (vt_primary *1000 / vt_secondary) / (ct_primary / ct_secondary)
 
         mode = settings_frame['Actual'][settings_frame['ParamPathENU'] == '310C']
         if len(mode.index) == 0:
@@ -150,7 +164,7 @@ class Pattern():
 
         else:
             z1_status = z1_status.iloc[0]
-            if mode == 0:
+            if z1_status == 0:
                 flags.append('"zone 1 disabled" ')
 
         distance_status = settings_frame['Actual'][settings_frame['ParamPathENU'] == '090B']
@@ -204,7 +218,7 @@ class Pattern():
 
         else:
             r1 = float(r1.iloc[0])
-        z1 = math.sqrt((x1 ** 2 + r1 ** 2))
+
         x1l = settings_frame['Actual'][settings_frame[
                                            'ParamPathENU'] == 'CUSTOM.PARAM.APP_CONFIG.ID_114436_1.ID_116685_2.ID_LMBRFLO1.ID_SETTING_GROUP1.ID_APP1_FAULTLOC_1_SET_5_VALUE_SETTING_LMBRFLO__SG_1']
         if len(x1l.index) == 0:
@@ -222,6 +236,7 @@ class Pattern():
         else:
             r1l = float(r1l.iloc[0])
         zline = math.sqrt((x1l ** 2 + r1l ** 2))
+        z1 = math.sqrt((x1 ** 2 + ((x1 / x1l) *  r1l) ** 2))
 
         if z1 is not np.nan and zline is not np.nan:
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
@@ -229,19 +244,112 @@ class Pattern():
 
         return (z1, zline, ' , '.join(flags))
 
+    def s7sd522_calculate_elements(self, settings_frame):
+        flags = []
 
+        vt_primary = settings_frame['Actual'][settings_frame['ParamPathENU'] == '0203']
+        if len(vt_primary.index) == 0:
+            flags.append('"missing primary VT" ')
+            vt_primary = np.nan
+
+        else:
+            vt_primary = float(vt_primary.iloc[0])
+
+        vt_secondary = settings_frame['Actual'][settings_frame['ParamPathENU'] == '0204']
+        if len(vt_secondary.index) == 0:
+            flags.append('"missing secondary VT" ')
+            vt_secondary = np.nan
+
+        else:
+            vt_secondary = float(vt_secondary.iloc[0])
+
+
+        ct_primary = settings_frame['Actual'][settings_frame['ParamPathENU'] == '0205']
+        if len(ct_primary.index) == 0:
+            flags.append('"missing primary ct" ')
+            ct_primary = np.nan
+
+        else:
+            ct_primary = float(ct_primary.iloc[0])
+
+        ct_secondary = settings_frame['Actual'][settings_frame['ParamPathENU'] == '0206']
+        if len(ct_secondary.index) == 0:
+            flags.append('"missing primary ct" ')
+            ct_secondary = np.nan
+
+        else:
+            ct_secondary = float(ct_secondary.iloc[0])
+            if ct_secondary == 1:
+                ct_secondary = 5
+            else:
+                ct_secondary = 1
+
+
+        impedance_factor = (vt_primary *1000 / vt_secondary) / (ct_primary / ct_secondary)
+
+
+
+
+        values = 1
+
+        z1_status = settings_frame['Actual'][settings_frame['ParamPathENU'] == '1601']
+        if len(z1_status.index) == 0:
+            flags.append('"missing distance zone 1 activation status" ')
+
+        else:
+            z1_status = z1_status.iloc[0]
+            if z1_status == 3:
+                flags.append('"zone 1 disabled" ')
+
+
+        distance_status = settings_frame['Actual'][settings_frame['ParamPathENU'] == '0115']
+        if len(distance_status.index) == 0:
+            flags.append('"missing distance function activation status" ')
+        else:
+            distance_status = distance_status.iloc[0]
+            if distance_status == 2:
+                flags.append('"distance function disableld"')
+
+        x1 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1603'])]
+        x1 = float(x1.iloc[0]) if len(x1.index) > 0 else np.nan
+
+        r1 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1603'])]
+        r1 = float(r1.iloc[0]) if len(r1.index) > 0 else np.nan
+
+
+        length = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1113'])]
+        length = float(length.iloc[0]) if len(length.index) > 0 else np.nan
+
+        x_per_km = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1111'])]
+        x_per_km = float(x_per_km.iloc[0]) if len(x_per_km.index) > 0 else np.nan
+
+        line_angle = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1105'])]
+        line_angle = float(line_angle.iloc[0]) if len(line_angle.index) > 0 else np.nan
+
+        zline = (length * x_per_km / math.sin( line_angle * (  math.pi /180 ))) * impedance_factor
+
+
+        z1 = ( x1 /   math.sin( line_angle * (  math.pi /180 )) )* impedance_factor
+
+
+
+
+        if z1 is not np.nan and zline is not np.nan:
+            if z1 > 0.9 * zline or z1 < 0.4 * zline:
+                flags.append(' z1 out of bounds')
+
+        return (z1, zline, ' , '.join(flags))
 locations_type = ['58EA705D-BE4D-4520-89C3-312DF1ADF48D', '3CF34EF0-1BA7-4FA5-B62B-5EF77C787428',
                   'CD2E75F4-A0F3-433A-9B87-64BC516AB566']
 excluded_types = [ 'D3752375-D674-446D-ADD8-DFC81C0514B3', '3D79BABE-EB5B-4DF3-9025-F6A3FBB7DA84', '2FD122B5-C47E-415C-8D1E-789BB7CF2331',
                    'AF2580E1-3D27-4F2B-B9C8-EDFAFC4E8E7F', 'A8CE7184-1C9D-49E3-AFFB-17486F0E74F6', 'AD0A13AB-61DE-4FBF-8ECB-24058170A17A', 'CBAFC824-9235-445C-8A3C-EB9D2D2EFCEB', '7B2E75C3-F0E0-4AB2-A2D9-AC0D84DE3B1A']
 regex = re.compile('NG|CENTRAL|EAST|SOUTH|WEST')
-location_data = pd.read_csv("C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\locations_data_new.csv", delimiter=';', skiprows=[1, 7237, 181433, 193733, 194016, 194017, 194029, 194035, 194044, 194278, 202498, 202511], encoding='mbcs')
-location_data = location_data[(~location_data['LocationTypeID'].isin(excluded_types)) & (
-    location_data['Location'].apply(lambda x: True if regex.match(str(x)) else False))]
+location_data = pd.read_csv("D:\\IPS_dumps\\locations_data_new.csv", delimiter='~',quoting=csv.QUOTE_NONE, skiprows=[], encoding='mbcs')
+location_data = location_data[( location_data['Location'].apply(lambda x: True if regex.match(str(x)) else False))]
 location_data.set_index(['Location', 'AssetID'], inplace=True)
 location_data.sort_index(inplace=True)
 
-psd = pd.read_csv("C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\psd.csv", delimiter=';', encoding='mbcs')
+psd = pd.read_csv("D:\\IPS_dumps\\psd.csv", delimiter=';', encoding='mbcs')
 test = psd['PhysicalValueTypeID'].unique()
 reaches = []
 line_impedances = []
@@ -253,42 +361,59 @@ parser = Parser(relay_patterns)
 count = 0
 results = []
 result_pd = pd.DataFrame()
-# pd_iterator = location_data.iterrows()
+result_pd_relays = pd.DataFrame()
 
 for i in location_data.iterrows():
-    t1 = time.perf_counter()
+    # t1 = time.perf_counter()
 
+    if count % 5000 == 0:
+        print(count)
 
     search_string = str(i[0][1])
 
-    ips = pd.read_hdf("C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\ips_with_path.h5", where=' AssetID=search_string')
-    print(count,time.perf_counter() - t1)
+    ips = pd.read_hdf("D:\\IPS_dumps\\ips_with_path.h5", where=' AssetID = \"{}\"'.format(search_string))
+    # print(count,time.perf_counter() - t1)
     t1 = time.perf_counter()
     ips.loc[:, ['Actual']] = ips['Actual'].map(lambda x: enum_dict.get(x, x))
 
-    temp = [*parser.parse_location(ips)]
+    temp = [*parser.parse_location(ips, i[1]['LocationTypeID'], i[1]['ParentLocationTypeID'])]
 
 
-    #
-    # if result[2] is not np.nan:
-    #     result_pd = result_pd.append([result], ignore_index=True)
     if temp[0]:
         # result = [j[0][0], j[0][1], *temp[1:4], temp[2]/ temp[3] *100, temp[4] ]
-        result = [i[0][0], i[0][1], *temp[1:]]
-        result_pd = result_pd.append([result], ignore_index=True)
+        if not all(v is None for v in temp[1:]):
+            result = [i[0][0], i[1]['Name'], i[1]['NameENU'], i[1]['DisplayENU']  , *temp[1:]]
+            result_pd = result_pd.append([result], ignore_index=True)
 
 
-        count += 1
+    if i[1]['LocationTypeID'] in locations_type:
 
-        if count == 500:
-            break
 
-result_pd.columns = ['Location','AssetID', 'Has no relays', 'relay has missing PSD','relay has no settings',  'latest setting not Active',  'setting has no parameters']
+        temp2 = [*parser.parse(ips)]
+
+
+        if temp2[0]:
+            # return True, 'P546' ,reach, line_impedance, flags
+            result = [i[0][0], i[0][1], *temp2[1:4], temp2[2]/ temp2[3] *100, temp2[4] ]
+
+            result_pd_relays = result_pd_relays.append([result], ignore_index=True)
+
+
+    count += 1
+
+    # if count == 500:
+    #     break
+
+result_pd.columns = ['Location','Asset Name', 'Relay type', 'Technology', 'Location has no relays', 'Relay placed in incorrect location',
+                     'Relay has missing PSD','Relay has no settings',  'latest setting not Active',  'Latest etting has no parameters']
 result_pd.set_index(['Location'])
 result_pd.sort_index(inplace=True)
+result_pd.to_csv('output_locations.csv', index=False)
 
-result_pd.to_csv('output.csv', index=False)
-
+result_pd_relays.columns = ['Location','AssetID', 'relay', 'z1', 'line Impedance','reach','flags']
+result_pd_relays.set_index(['Location'])
+result_pd_relays.sort_index(inplace=True)
+result_pd_relays.to_csv('output_relays.csv', index=False)
 # assets['z1'] = pd.Series(reaches, index=assets.index)
 # assets['line_impedance'] = pd.Series(line_impedances, index=assets.index)
 # assets['flags'] = pd.Series(flagses, index=assets.index)
