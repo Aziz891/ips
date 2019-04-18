@@ -45,18 +45,15 @@ class Parser():
             return False, np.nan, np.nan, np.nan, np.nan
 
         if dataframe['RelParPatternID'].iloc[0] in self.p546_patterns:
-            reach, line_impedance, flags = Pattern().p546_calculate_elements(dataframe)
-            return True, 'P546' ,reach, line_impedance, flags
+            return [True, 'P546', *Pattern().p546_calculate_elements(dataframe)]
         elif dataframe['RelParPatternID'].iloc[0] in self.red670_patterns:
-            reach, line_impedance, flags = Pattern().red670_calculate_elements(dataframe)
-            return True, 'RED670' , reach, line_impedance, flags
+            return [True, 'RED670' , *Pattern().red670_calculate_elements(dataframe)]
         elif dataframe['RelParPatternID'].iloc[0] in self.s7sd522_paterns:
-            reach, line_impedance, flags = Pattern().s7sd522_calculate_elements(dataframe)
-            return True, '7SD522', reach, line_impedance, flags
+            return [True, '7SD522', *Pattern().s7sd522_calculate_elements(dataframe)]
 
 
         else:
-            return False, np.nan, np.nan, np.nan, np.nan
+            return [False]
 
     def hdf5_string(self):
 
@@ -178,16 +175,30 @@ class Pattern():
         z1 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['3202'])] if mode == 1 else \
             settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['3121'])]
 
-        zline = settings_frame['Actual'][settings_frame['ParamPathENU'] == '3003']
+        z2 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['3210'])] if mode == 1 else \
+            settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['3131'])]
+
+        z3 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['3220'])] if mode == 1 else \
+            settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['3141'])]
+
         z1 = float(z1.iloc[0]) if len(z1.index) > 0 else np.nan
-        zline = float(zline.iloc[0]) if len(zline.index) > 0 else np.nan
         z1 = z1 if values == 0 else z1 * impedance_factor
+
+        z2 = float(z2.iloc[0]) if len(z2.index) > 0 else np.nan
+        z2 = z2 if values == 0 else z2 * impedance_factor
+        
+        z3 = float(z3.iloc[0]) if len(z3.index) > 0 else np.nan
+        z3 = z3 if values == 0 else z3 * impedance_factor
+
+        zline = settings_frame['Actual'][settings_frame['ParamPathENU'] == '3003']
+        zline = float(zline.iloc[0]) if len(zline.index) > 0 else np.nan
+
         zline = zline if values == 0 else zline * impedance_factor
         if z1 is not np.nan and zline is not np.nan:
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
                 flags.append(' z1 out of bounds')
 
-        return (z1, zline, ' , '.join(flags)) if mode == 1 else (zline * z1 / 100, zline, ' , '.join(flags))
+        return (z1, z2, z3, zline, ' , '.join(flags)) if mode == 1 else ( zline * z1 / 100, zline * z2 / 100,zline * z3 / 100,zline, ' , '.join(flags))
 
     def red670_calculate_elements(self, settings_frame):
         flags = []
@@ -210,6 +221,22 @@ class Pattern():
 
         else:
             x1 = float(x1.iloc[0])
+        x2 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              'CUSTOM.PARAM.APP_CONFIG.ID_201722_1.ID_116541_2.ID_ZMQAPDIS2.ID_SETTING_GROUP1.ID_APP1_DISTANCE_SE95Z1_A_2_SET_27_VALUE_SETTING_ZMQAPDIS__SG_1'])]
+        if len(x2.index) == 0:
+            flags.append('"missing distance zone 2 reactance" ')
+            x2 = np.nan
+
+        else:
+            x2 = float(x2.iloc[0])
+        x3 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              'CUSTOM.PARAM.APP_CONFIG.ID_201722_1.ID_116541_2.ID_ZMQAPDIS3.ID_SETTING_GROUP1.ID_APP1_DISTANCE_SE95Z1_A_3_SET_27_VALUE_SETTING_ZMQAPDIS__SG_1'])]
+        if len(x3.index) == 0:
+            flags.append('"missing distance zone 3 reactance" ')
+            x3 = np.nan
+
+        else:
+            x3 = float(x3.iloc[0])
         r1 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
                                                                               'CUSTOM.PARAM.APP_CONFIG.ID_201722_1.ID_116541_2.ID_ZMQPDIS1.ID_SETTING_GROUP1.ID_APP1_DISTANCE_SE95Z1_A_1_SET_28_VALUE_SETTING_ZMQPDIS__SG_1'])]
         if len(r1.index) == 0:
@@ -218,6 +245,22 @@ class Pattern():
 
         else:
             r1 = float(r1.iloc[0])
+        r2 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              'CUSTOM.PARAM.APP_CONFIG.ID_201722_1.ID_116541_2.ID_ZMQAPDIS2.ID_SETTING_GROUP1.ID_APP1_DISTANCE_SE95Z1_A_2_SET_28_VALUE_SETTING_ZMQAPDIS__SG_1'])]
+        if len(r2.index) == 0:
+            flags.append('"missing distance zone 2 resistance" ')
+            r2 = np.nan
+
+        else:
+            r2 = float(r2.iloc[0])
+        r3 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              'CUSTOM.PARAM.APP_CONFIG.ID_201722_1.ID_116541_2.ID_ZMQAPDIS3.ID_SETTING_GROUP1.ID_APP1_DISTANCE_SE95Z1_A_3_SET_28_VALUE_SETTING_ZMQAPDIS__SG_1'])]
+        if len(r3.index) == 0:
+            flags.append('"missing distance zone 3 resistance" ')
+            r3 = np.nan
+
+        else:
+            r3 = float(r3.iloc[0])
 
         x1l = settings_frame['Actual'][settings_frame[
                                            'ParamPathENU'] == 'CUSTOM.PARAM.APP_CONFIG.ID_114436_1.ID_116685_2.ID_LMBRFLO1.ID_SETTING_GROUP1.ID_APP1_FAULTLOC_1_SET_5_VALUE_SETTING_LMBRFLO__SG_1']
@@ -237,12 +280,14 @@ class Pattern():
             r1l = float(r1l.iloc[0])
         zline = math.sqrt((x1l ** 2 + r1l ** 2))
         z1 = math.sqrt((x1 ** 2 + ((x1 / x1l) *  r1l) ** 2))
+        z2 = math.sqrt((x2 ** 2 + ((x2 / x1l) *  r1l) ** 2))
+        z3 = math.sqrt((x3 ** 2 + ((x3 / x1l) *  r1l) ** 2))
 
         if z1 is not np.nan and zline is not np.nan:
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
                 flags.append(' z1 out of bounds')
 
-        return (z1, zline, ' , '.join(flags))
+        return (z1, z2, z3, zline, ' , '.join(flags))
 
     def s7sd522_calculate_elements(self, settings_frame):
         flags = []
@@ -312,6 +357,10 @@ class Pattern():
 
         x1 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1603'])]
         x1 = float(x1.iloc[0]) if len(x1.index) > 0 else np.nan
+        x2 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1613'])]
+        x2 = float(x2.iloc[0]) if len(x2.index) > 0 else np.nan
+        x3 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1623'])]
+        x3 = float(x3.iloc[0]) if len(x3.index) > 0 else np.nan
 
         r1 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin(['1603'])]
         r1 = float(r1.iloc[0]) if len(r1.index) > 0 else np.nan
@@ -330,6 +379,8 @@ class Pattern():
 
 
         z1 = ( x1 /   math.sin( line_angle * (  math.pi /180 )) )* impedance_factor
+        z2 = ( x2 /   math.sin( line_angle * (  math.pi /180 )) )* impedance_factor
+        z3 = ( x3 /   math.sin( line_angle * (  math.pi /180 )) )* impedance_factor
 
 
 
@@ -338,7 +389,7 @@ class Pattern():
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
                 flags.append(' z1 out of bounds')
 
-        return (z1, zline, ' , '.join(flags))
+        return (z1, z2, z3, zline, ' , '.join(flags))
 locations_type = ['58EA705D-BE4D-4520-89C3-312DF1ADF48D', '3CF34EF0-1BA7-4FA5-B62B-5EF77C787428',
                   'CD2E75F4-A0F3-433A-9B87-64BC516AB566']
 excluded_types = [ 'D3752375-D674-446D-ADD8-DFC81C0514B3', '3D79BABE-EB5B-4DF3-9025-F6A3FBB7DA84', '2FD122B5-C47E-415C-8D1E-789BB7CF2331',
@@ -350,7 +401,6 @@ location_data.set_index(['Location', 'AssetID'], inplace=True)
 location_data.sort_index(inplace=True)
 
 psd = pd.read_csv("D:\\IPS_dumps\\psd.csv", delimiter=';', encoding='mbcs')
-test = psd['PhysicalValueTypeID'].unique()
 reaches = []
 line_impedances = []
 flagses = []
@@ -364,15 +414,18 @@ result_pd = pd.DataFrame()
 result_pd_relays = pd.DataFrame()
 
 for i in location_data.iterrows():
-    # t1 = time.perf_counter()
+    t1 = time.perf_counter()
 
     if count % 5000 == 0:
         print(count)
 
+    if count == 578:
+        print()
+
     search_string = str(i[0][1])
 
     ips = pd.read_hdf("D:\\IPS_dumps\\ips_with_path.h5", where=' AssetID = \"{}\"'.format(search_string))
-    # print(count,time.perf_counter() - t1)
+    print(count,time.perf_counter() - t1)
     t1 = time.perf_counter()
     ips.loc[:, ['Actual']] = ips['Actual'].map(lambda x: enum_dict.get(x, x))
 
@@ -394,15 +447,15 @@ for i in location_data.iterrows():
 
         if temp2[0]:
             # return True, 'P546' ,reach, line_impedance, flags
-            result = [i[0][0], i[0][1], *temp2[1:4], temp2[2]/ temp2[3] *100, temp2[4] ]
+            result = [i[0][0], i[0][1], *temp2[1:-1], temp2[2]/ temp2[5] *100, temp2[3]/ temp2[5] *100, temp2[4]/ temp2[5] *100, temp2[-1] ]
 
             result_pd_relays = result_pd_relays.append([result], ignore_index=True)
 
 
     count += 1
 
-    # if count == 500:
-    #     break
+    if count == 5000:
+        break
 
 result_pd.columns = ['Location','Asset Name', 'Relay type', 'Technology', 'Location has no relays', 'Relay placed in incorrect location',
                      'Relay has missing PSD','Relay has no settings',  'latest setting not Active',  'Latest etting has no parameters']
@@ -410,7 +463,7 @@ result_pd.set_index(['Location'])
 result_pd.sort_index(inplace=True)
 result_pd.to_csv('output_locations.csv', index=False)
 
-result_pd_relays.columns = ['Location','AssetID', 'relay', 'z1', 'line Impedance','reach','flags']
+result_pd_relays.columns = ['Location','AssetID', 'relay', 'z1', 'z2', 'z3', 'line Impedance','reach_z1', 'reach_z2', 'reach_z3','flags']
 result_pd_relays.set_index(['Location'])
 result_pd_relays.sort_index(inplace=True)
 result_pd_relays.to_csv('output_relays.csv', index=False)
