@@ -103,6 +103,9 @@ class Parser():
 
 
 class Pattern():
+    k0_upper_limit = 0.7
+    k0_angle_range = [-170, -100]
+
 
     def p546_calculate_elements(self, settings_frame):
         flags = []
@@ -196,7 +199,33 @@ class Pattern():
         zline = zline if values == 0 else zline * impedance_factor
         if z1 is not np.nan and zline is not np.nan:
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
-                flags.append(' z1 out of bounds')
+                flags.append(' z1 out of range')
+
+
+        
+        k0_z = settings_frame['Actual'][settings_frame['ParamPathENU'] == '3005']
+        if len(k0_z.index) == 0:
+            flags.append('"missing compensation factor" ')
+
+        else:
+            k0_z = k0_z.iloc[0]
+
+        k0_angle = settings_frame['Actual'][settings_frame['ParamPathENU'] == '3006']
+        if len( k0_angle.index) == 0:
+            flags.append('"missing compensation factor angle" ')
+
+        else:
+            k0_angle = k0_angle.iloc[0]
+
+        if k0_z > Pattern.k0_upper_limit:
+            flags.append('"compensation factor greater than {}"'.format(Pattern.k0_upper_limit))
+
+        if k0_z < 0.3 and not ( k0_angle > Pattern.k0_angle_range[0] and k0_angle < Pattern.k0_angle_range[1] ):
+             flags.append('"compensation factor angle outside range "')
+
+
+        
+         
 
         return (z1, z2, z3, zline, ' , '.join(flags)) if mode == 1 else ( zline * z1 / 100, zline * z2 / 100,zline * z3 / 100,zline, ' , '.join(flags))
 
@@ -285,7 +314,7 @@ class Pattern():
 
         if z1 is not np.nan and zline is not np.nan:
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
-                flags.append(' z1 out of bounds')
+                flags.append(' z1 out of range')
 
         return (z1, z2, z3, zline, ' , '.join(flags))
 
@@ -387,7 +416,7 @@ class Pattern():
 
         if z1 is not np.nan and zline is not np.nan:
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
-                flags.append(' z1 out of bounds')
+                flags.append(' z1 out of range')
 
         return (z1, z2, z3, zline, ' , '.join(flags))
 locations_type = ['58EA705D-BE4D-4520-89C3-312DF1ADF48D', '3CF34EF0-1BA7-4FA5-B62B-5EF77C787428',
