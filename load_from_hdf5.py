@@ -1,7 +1,12 @@
 import pandas as pd
-import time, pickle, csv, re, math
+import time, pickle, csv, re, math, cmath
 import numpy as np
 from itertools import zip_longest
+
+
+psd_path = 'C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\psd.csv'
+hdf5_path = 'C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\ips_with_path.h5'
+location_path = 'C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\locations_data_new.csv'
 
 
 with open('enum_dict.pkl', 'rb') as f:
@@ -206,16 +211,18 @@ class Pattern():
         k0_z = settings_frame['Actual'][settings_frame['ParamPathENU'] == '3005']
         if len(k0_z.index) == 0:
             flags.append('"missing compensation factor" ')
+            k0_z = np.nan
 
         else:
-            k0_z = k0_z.iloc[0]
+            k0_z = float(k0_z.iloc[0])
 
         k0_angle = settings_frame['Actual'][settings_frame['ParamPathENU'] == '3006']
         if len( k0_angle.index) == 0:
             flags.append('"missing compensation factor angle" ')
+            k0_angle = np.nan
 
         else:
-            k0_angle = k0_angle.iloc[0]
+            k0_angle = float(k0_angle.iloc[0])
 
         if k0_z > Pattern.k0_upper_limit:
             flags.append('"compensation factor greater than {}"'.format(Pattern.k0_upper_limit))
@@ -227,7 +234,7 @@ class Pattern():
         
          
 
-        return (z1, z2, z3, zline, ' , '.join(flags)) if mode == 1 else ( zline * z1 / 100, zline * z2 / 100,zline * z3 / 100,zline, ' , '.join(flags))
+        return (z1, z2, z3, zline, k0_z, k0_angle,' , '.join(flags)) if mode == 1 else ( zline * z1 / 100, zline * z2 / 100,zline * z3 / 100,zline, k0_z, k0_angle,  ' , '.join(flags))
 
     def red670_calculate_elements(self, settings_frame):
         flags = []
@@ -316,7 +323,43 @@ class Pattern():
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
                 flags.append(' z1 out of range')
 
-        return (z1, z2, z3, zline, ' , '.join(flags))
+        
+        
+        x0 = settings_frame['Actual'][settings_frame['ParamPathENU'] == 'CUSTOM.PARAM.APP_CONFIG.ID_201722_1.ID_116541_2.ID_ZMQAPDIS2.ID_SETTING_GROUP1.ID_APP1_DISTANCE_SE95Z1_A_2_SET_29_VALUE_SETTING_ZMQAPDIS__SG_1']
+        if len(x0.index) == 0:
+            flags.append('"missing compensation factor" ')
+            x0 = np.nan
+
+        else:
+            x0 = float(x0.iloc[0])
+
+
+        r0 = settings_frame['Actual'][settings_frame['ParamPathENU'] == 'CUSTOM.PARAM.APP_CONFIG.ID_201722_1.ID_116541_2.ID_ZMQPDIS1.ID_SETTING_GROUP1.ID_APP1_DISTANCE_SE95Z1_A_1_SET_30_VALUE_SETTING_ZMQPDIS__SG_1']
+        if len( r0.index) == 0:
+            flags.append('"missing compensation factor angle" ')
+            r0 = np.nan
+
+        else:
+            r0 = float(r0.iloc[0])
+        
+     
+        z_zero_1 = complex(r0, x0)
+        z_pos_1 = complex(r1l, x1l)
+        k0 = ((z_zero_1 / z_pos_1) -1) / 3
+        k0_z = abs(k0)
+        k0_angle = cmath.phase(k0)
+
+
+        
+
+        if k0_z > Pattern.k0_upper_limit:
+            flags.append('"compensation factor greater than {}"'.format(Pattern.k0_upper_limit))
+
+        if k0_z < 0.3 and not ( k0_angle > Pattern.k0_angle_range[0] and k0_angle < Pattern.k0_angle_range[1] ):
+             flags.append('"compensation factor angle outside range "')
+
+
+        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags))
 
     def s7sd522_calculate_elements(self, settings_frame):
         flags = []
@@ -411,6 +454,32 @@ class Pattern():
         z2 = ( x2 /   math.sin( line_angle * (  math.pi /180 )) )* impedance_factor
         z3 = ( x3 /   math.sin( line_angle * (  math.pi /180 )) )* impedance_factor
 
+               
+        x0 = settings_frame['Actual'][settings_frame['ParamPathENU'] == '1117']
+        if len(x0.index) == 0:
+            flags.append('"missing compensation factor" ')
+            x0 = np.nan
+
+        else:
+            x0 = float(x0.iloc[0])
+
+
+        r0 = settings_frame['Actual'][settings_frame['ParamPathENU'] == '1116']
+        if len( r0.index) == 0:
+            flags.append('"missing compensation factor angle" ')
+            r0 = np.nan
+            
+
+        else:
+            r0 = float(r0.iloc[0])
+
+        z0_complex = complex((( (r0 *3) + 1 ) * zline * math.cos( line_angle * (  math.pi /180 ))   ), (( (x0 *3) + 1 )* zline * math.sin( line_angle * (  math.pi /180 ))   ) )
+        zpos_complex = complex(zline * math.cos( line_angle * (math.pi / 180)), zline * math.sin( line_angle * (math.pi / 180))   )
+        k0_complex = ((z0_complex / zpos_complex) - 1) / 3
+        k0_z = abs(k0_complex)
+        k0_angle = cmath.phase(k0_complex) * (180 / math.pi)
+         
+
 
 
 
@@ -418,18 +487,18 @@ class Pattern():
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
                 flags.append(' z1 out of range')
 
-        return (z1, z2, z3, zline, ' , '.join(flags))
+        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags))
 locations_type = ['58EA705D-BE4D-4520-89C3-312DF1ADF48D', '3CF34EF0-1BA7-4FA5-B62B-5EF77C787428',
                   'CD2E75F4-A0F3-433A-9B87-64BC516AB566']
 excluded_types = [ 'D3752375-D674-446D-ADD8-DFC81C0514B3', '3D79BABE-EB5B-4DF3-9025-F6A3FBB7DA84', '2FD122B5-C47E-415C-8D1E-789BB7CF2331',
                    'AF2580E1-3D27-4F2B-B9C8-EDFAFC4E8E7F', 'A8CE7184-1C9D-49E3-AFFB-17486F0E74F6', 'AD0A13AB-61DE-4FBF-8ECB-24058170A17A', 'CBAFC824-9235-445C-8A3C-EB9D2D2EFCEB', '7B2E75C3-F0E0-4AB2-A2D9-AC0D84DE3B1A']
 regex = re.compile('NG|CENTRAL|EAST|SOUTH|WEST')
-location_data = pd.read_csv("D:\\IPS_dumps\\locations_data_new.csv", delimiter='~',quoting=csv.QUOTE_NONE, skiprows=[], encoding='mbcs')
+location_data = pd.read_csv(location_path, delimiter='~',quoting=csv.QUOTE_NONE, skiprows=[], encoding='mbcs')
 location_data = location_data[( location_data['Location'].apply(lambda x: True if regex.match(str(x)) else False))]
 location_data.set_index(['Location', 'AssetID'], inplace=True)
 location_data.sort_index(inplace=True)
 
-psd = pd.read_csv("D:\\IPS_dumps\\psd.csv", delimiter=';', encoding='mbcs')
+psd = pd.read_csv(psd_path, delimiter=';', encoding='mbcs')
 reaches = []
 line_impedances = []
 flagses = []
@@ -453,7 +522,7 @@ for i in location_data.iterrows():
 
     search_string = str(i[0][1])
 
-    ips = pd.read_hdf("D:\\IPS_dumps\\ips_with_path.h5", where=' AssetID = \"{}\"'.format(search_string))
+    ips = pd.read_hdf(hdf5_path, where=' AssetID = \"{}\"'.format(search_string))
     print(count,time.perf_counter() - t1)
     t1 = time.perf_counter()
     ips.loc[:, ['Actual']] = ips['Actual'].map(lambda x: enum_dict.get(x, x))
@@ -483,7 +552,7 @@ for i in location_data.iterrows():
 
     count += 1
 
-    if count == 5000:
+    if count == 2000:
         break
 
 result_pd.columns = ['Location','Asset Name', 'Relay type', 'Technology', 'Location has no relays', 'Relay placed in incorrect location',
@@ -492,7 +561,7 @@ result_pd.set_index(['Location'])
 result_pd.sort_index(inplace=True)
 result_pd.to_csv('output_locations.csv', index=False)
 
-result_pd_relays.columns = ['Location','AssetID', 'relay', 'z1', 'z2', 'z3', 'line Impedance','reach_z1', 'reach_z2', 'reach_z3','flags']
+result_pd_relays.columns = ['Location','AssetID', 'relay', 'z1', 'z2', 'z3', 'line Impedance', 'k0 magnitude', 'k0 angle','reach_z1', 'reach_z2', 'reach_z3','flags']
 result_pd_relays.set_index(['Location'])
 result_pd_relays.sort_index(inplace=True)
 result_pd_relays.to_csv('output_relays.csv', index=False)
