@@ -22,7 +22,8 @@ relay_patterns = {'p546': list(
                                      ['6d8efa16-a0c3-44fc-b1c4-aecf3351eff2', '62f796dd-e4e9-4dd3-b9b1-e11e9b449759'
                                                                               'd3165fb1-91c3-49e0-b74f-89b96e3dabb1'])),
         '7sd522' : {'779C87B1-6469-40B8-A514-6D47CFDC550F', '9A12628E-31C8-486C-91C0-B8774F22A5EA',
-                    '1700E526-EAA3-4C14-B992-632EE4CD104A'}
+                    '1700E526-EAA3-4C14-B992-632EE4CD104A'},
+        'sel411' : {'B3DBE96E-811D-4A9F-B241-D1B4303A5209'}
                   }
 
 def grouper(n, iterable, fillvalue=None):
@@ -44,6 +45,7 @@ class Parser():
         self.p546_patterns = dictionary['p546']
         self.red670_patterns = dictionary['red670']
         self.s7sd522_paterns = dictionary['7sd522']
+        self.sel411_paterns = dictionary['sel411']
 
     def parse(self, dataframe):
         if dataframe.empty:
@@ -55,6 +57,8 @@ class Parser():
             return [True, 'RED670' , *Pattern().red670_calculate_elements(dataframe)]
         elif dataframe['RelParPatternID'].iloc[0] in self.s7sd522_paterns:
             return [True, '7SD522', *Pattern().s7sd522_calculate_elements(dataframe)]
+        elif dataframe['RelParPatternID'].iloc[0] in self.sel411_paterns:
+            return [True, '7SD522', *Pattern().sel_411_calculate_elements(dataframe)]
 
 
         else:
@@ -344,10 +348,10 @@ class Pattern():
         
      
         z_zero_1 = complex(r0, x0)
-        z_pos_1 = complex(r1l, x1l)
+        z_pos_1 = complex(r1, x1)
         k0 = ((z_zero_1 / z_pos_1) -1) / 3
         k0_z = abs(k0)
-        k0_angle = cmath.phase(k0)
+        k0_angle = cmath.phase(k0) * (180 / math.pi)
 
 
         
@@ -488,6 +492,165 @@ class Pattern():
                 flags.append(' z1 out of range')
 
         return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags))
+
+    def sel_411_calculate_elements(self, settings_frame):
+
+        flags = []
+
+        
+        vt_ratio = settings_frame['Actual'][settings_frame['ParamPathENU'] == '[Group 1].[PTRZ]']
+        if len(vt_ratio.index) == 0:
+            flags.append('"missing VT ratio" ')
+            vt_ratio = np.nan
+
+        else:
+            vt_ratio = float(vt_ratio.iloc[0])
+
+        ct_ratio = settings_frame['Actual'][settings_frame['ParamPathENU'] == '[Group 1].[CTRW]']
+        if len(ct_ratio.index) == 0:
+            flags.append('"missing  CT ratio" ')
+            ct_ratio = np.nan
+
+        else:
+            ct_ratio = float(ct_ratio.iloc[0])
+
+        
+        impedance_factor = vt_ratio/ ct_ratio
+
+        x1 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              '[Group 1].[XP1]'])]
+        if len(x1.index) == 0:
+            flags.append('"missing distance zone 1 reactance" ')
+            x1 = np.nan
+
+        else:
+            x1 = float(x1.iloc[0])
+        x2 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              '[Group 1].[XP2]'])]
+        if len(x2.index) == 0:
+            flags.append('"missing distance zone 2 reactance" ')
+            x2 = np.nan
+
+        else:
+            x2 = float(x2.iloc[0])
+        x3 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              '[Group 1].[XP3]'])]
+        if len(x3.index) == 0:
+            flags.append('"missing distance zone 3 reactance" ')
+            x3 = np.nan
+
+        else:
+            x3 = float(x3.iloc[0])
+        r1 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              '[Group 1].[RP1]'])]
+        if len(r1.index) == 0:
+            flags.append('"missing distance zone 1 resistance" ')
+            r1 = np.nan
+
+        else:
+            r1 = float(r1.iloc[0])
+        r2 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              '[Group 1].[RP2]'])]
+        if len(r2.index) == 0:
+            flags.append('"missing distance zone 2 resistance" ')
+            r2 = np.nan
+
+        else:
+            r2 = float(r2.iloc[0])
+        r3 = settings_frame['Actual'][settings_frame['ParamPathENU'].isin([
+                                                                              '[Group 1].[RP3]'])]
+        if len(r3.index) == 0:
+            flags.append('"missing distance zone 3 resistance" ')
+            r3 = np.nan
+
+        else:
+            r3 = float(r3.iloc[0])
+
+        zline_mag = settings_frame['Actual'][settings_frame[
+                                           'ParamPathENU'] == '[Group 1].[Z1MAG]']
+        if len(zline_mag.index) == 0:
+            flags.append('"missing line impedance magnitude" ')
+            zline_mag = np.nan
+
+        else:
+            zline_mag = float(zline_mag.iloc[0])
+        zline_angle = settings_frame['Actual'][settings_frame[
+                                           'ParamPathENU'] == '[Group 1].[Z1ANG]']
+        if len(zline_angle.index) == 0:
+            flags.append('"missing line reactance" ')
+            zline_angle = np.nan
+
+        else:
+            zline_angle = float(zline_angle.iloc[0])
+        zline = zline_mag * impedance_factor
+        x1l = zline * math.sin( zline_angle * (math.pi / 180)) * impedance_factor
+        r1l = zline * math.cos( zline_angle * (math.pi / 180)) * impedance_factor
+        z1 = math.sqrt((x1 ** 2 + ((x1 / x1l) *  r1l) ** 2)) * impedance_factor
+        z2 = math.sqrt((x2 ** 2 + ((x2 / x1l) *  r1l) ** 2)) * impedance_factor
+        z3 = math.sqrt((x3 ** 2 + ((x3 / x1l) *  r1l) ** 2)) * impedance_factor
+
+        if z1 is not np.nan and zline is not np.nan:
+            if z1 > 0.9 * zline or z1 < 0.4 * zline:
+                flags.append(' z1 out of range')
+
+        
+        
+        x0 = settings_frame['Actual'][settings_frame['ParamPathENU'] == '[Group 1].[XG1]']
+        if len(x0.index) == 0:
+            flags.append('"missing compensation factor" ')
+            x0 = np.nan
+
+        else:
+            x0 = float(x0.iloc[0])
+
+
+        r0 = settings_frame['Actual'][settings_frame['ParamPathENU'] == '[Group 1].[RG1]']
+        if len( r0.index) == 0:
+            flags.append('"missing compensation factor angle" ')
+            r0 = np.nan
+
+        else:
+            r0 = float(r0.iloc[0])
+        
+
+        
+        k0_z = settings_frame['Actual'][settings_frame['ParamPathENU'] == '[Group 1].[k0M1]']
+        if len(k0_z.index) == 0:
+            flags.append('"missing compensation factor" ')
+            k0_z = np.nan
+
+        else:
+            k0_z = float(k0_z.iloc[0])
+
+
+        k0_angle = settings_frame['Actual'][settings_frame['ParamPathENU'] == '[Group 1].[k0A1]']
+        if len( k0_angle.index) == 0:
+            flags.append('"missing compensation factor angle" ')
+            k0_angle = np.nan
+
+        else:
+            k0_angle = float(k0_angle.iloc[0])
+   
+
+        
+
+        if k0_z > Pattern.k0_upper_limit:
+            flags.append('"compensation factor greater than {}"'.format(Pattern.k0_upper_limit))
+
+        if k0_z < 0.3 and not ( k0_angle > Pattern.k0_angle_range[0] and k0_angle < Pattern.k0_angle_range[1] ):
+             flags.append('"compensation factor angle outside range "')
+
+
+        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags))
+
+
+        
+
+
+
+
+
+
 locations_type = ['58EA705D-BE4D-4520-89C3-312DF1ADF48D', '3CF34EF0-1BA7-4FA5-B62B-5EF77C787428',
                   'CD2E75F4-A0F3-433A-9B87-64BC516AB566']
 excluded_types = [ 'D3752375-D674-446D-ADD8-DFC81C0514B3', '3D79BABE-EB5B-4DF3-9025-F6A3FBB7DA84', '2FD122B5-C47E-415C-8D1E-789BB7CF2331',

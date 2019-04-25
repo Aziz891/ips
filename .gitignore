@@ -11,5 +11,7 @@ __pycache__/
 test2.csv
 output.csv
 .idea/
+output_relays.csv
+output_locations.csv
 
 
