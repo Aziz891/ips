@@ -58,7 +58,7 @@ class Parser():
         elif dataframe['RelParPatternID'].iloc[0] in self.s7sd522_paterns:
             return [True, '7SD522', *Pattern().s7sd522_calculate_elements(dataframe)]
         elif dataframe['RelParPatternID'].iloc[0] in self.sel411_paterns:
-            return [True, '7SD522', *Pattern().sel_411_calculate_elements(dataframe)]
+            return [True, 'SEL-411', *Pattern().sel_411_calculate_elements(dataframe)]
 
 
         else:
@@ -238,7 +238,7 @@ class Pattern():
         
          
 
-        return (z1, z2, z3, zline, k0_z, k0_angle,' , '.join(flags)) if mode == 1 else ( zline * z1 / 100, zline * z2 / 100,zline * z3 / 100,zline, k0_z, k0_angle,  ' , '.join(flags))
+        return (z1, z2, z3, zline, k0_z, k0_angle,' , '.join(flags)) if mode == 1 else ( zline * z1 / 100, zline * z2 / 100,zline * z3 / 100,zline, k0_z, k0_angle,  ' , '.join(flags), None,None)
 
     def red670_calculate_elements(self, settings_frame):
         flags = []
@@ -363,7 +363,7 @@ class Pattern():
              flags.append('"compensation factor angle outside range "')
 
 
-        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags))
+        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags), None,None)
 
     def s7sd522_calculate_elements(self, settings_frame):
         flags = []
@@ -491,7 +491,7 @@ class Pattern():
             if z1 > 0.9 * zline or z1 < 0.4 * zline:
                 flags.append(' z1 out of range')
 
-        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags))
+        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags), None, None)
 
     def sel_411_calculate_elements(self, settings_frame):
 
@@ -641,7 +641,7 @@ class Pattern():
              flags.append('"compensation factor angle outside range "')
 
 
-        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags))
+        return (z1, z2, z3, zline, k0_z, k0_angle, ' , '.join(flags), None, None)
 
 
         
@@ -708,36 +708,23 @@ for i in location_data.iterrows():
 
         if temp2[0]:
             # return True, 'P546' ,reach, line_impedance, flags
-            result = [i[0][0], i[0][1], *temp2[1:-1], temp2[2]/ temp2[5] *100, temp2[3]/ temp2[5] *100, temp2[4]/ temp2[5] *100, temp2[-1] ]
+            result = [i[0][0], i[0][1], *temp2[1:-3], temp2[2]/ temp2[5] *100, temp2[3]/ temp2[5] *100, temp2[4]/ temp2[5] *100, *temp2[-3:] ]
 
             result_pd_relays = result_pd_relays.append([result], ignore_index=True)
 
 
     count += 1
 
-    if count == 2000:
+    if count == 200:
         break
 
 result_pd.columns = ['Location','Asset Name', 'Relay type', 'Technology', 'Location has no relays', 'Relay placed in incorrect location',
-                     'Relay has missing PSD','Relay has no settings',  'latest setting not Active',  'Latest etting has no parameters']
+                     'Relay has missing PSD','Relay has no settings',  'latest setting not Active',  'Latest setting has no parameters']
 result_pd.set_index(['Location'])
 result_pd.sort_index(inplace=True)
 result_pd.to_csv('output_locations.csv', index=False)
 
-result_pd_relays.columns = ['Location','AssetID', 'relay', 'z1', 'z2', 'z3', 'line Impedance', 'k0 magnitude', 'k0 angle','reach_z1', 'reach_z2', 'reach_z3','flags']
+result_pd_relays.columns = ['Location','AssetID', 'relay', 'z1', 'z2', 'z3', 'line Impedance', 'k0 magnitude', 'k0 angle','reach_z1', 'reach_z2', 'reach_z3','flags',  'fault recording setting disabled', 'fault recording setting missing']
 result_pd_relays.set_index(['Location'])
 result_pd_relays.sort_index(inplace=True)
 result_pd_relays.to_csv('output_relays.csv', index=False)
-# assets['z1'] = pd.Series(reaches, index=assets.index)
-# assets['line_impedance'] = pd.Series(line_impedances, index=assets.index)
-# assets['flags'] = pd.Series(flagses, index=assets.index)
-#
-# location_data = pd.read_csv('D:/IPS_dumps/location_data.csv', delimiter=';', skiprows=[1], encoding='mbcs')
-# location_data = location_data.set_index('AssetID')
-# assets = assets.join(location_data, on='AssetID')
-# assets = assets[['Location', 'AssetID', 'z1', 'line_impedance', 'flags']]
-# assets.set_index(['Location', 'AssetID'], inplace=True)
-#
-# assets.to_csv('D:/IPS_dumps/output.csv')
-# assets.sort_index(inplace=True)
-# t2 = time.perf_counter() - t1
