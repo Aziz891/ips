@@ -2,11 +2,8 @@ import pandas as pd
 import time, pickle, csv, re, math, cmath
 import numpy as np
 from itertools import zip_longest
+from path_locations import *
 
-
-psd_path = 'C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\psd.csv'
-hdf5_path = 'C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\ips_with_path.h5'
-location_path = 'C:\\Users\\aziza\\Documents\\Projects\\IPS_dumps\\locations_data_new.csv'
 
 
 with open('enum_dict.pkl', 'rb') as f:
@@ -118,6 +115,18 @@ class Pattern():
 
     def p546_calculate_elements(self, settings_frame):
         flags = []
+
+        fr_1 = settings_frame['Actual'][settings_frame['ParamPathENU'] == 'OB08']
+        if len(fr_1.index) == 0:
+            fr_1 = np.nan
+        else:
+            fr_1 = float(fr_1.iloc[0])
+        test = (fr_1 == np.nan)
+
+      
+
+
+
 
         vt_primary = settings_frame['Actual'][settings_frame['ParamPathENU'] == '0A01']
         if len(vt_primary.index) == 0:
@@ -238,7 +247,7 @@ class Pattern():
         
          
 
-        return (z1, z2, z3, zline, k0_z, k0_angle,' , '.join(flags)) if mode == 1 else ( zline * z1 / 100, zline * z2 / 100,zline * z3 / 100,zline, k0_z, k0_angle,  ' , '.join(flags), None,None)
+        return (z1, z2, z3, zline, k0_z, k0_angle,' , '.join(flags), None, None) if mode == 1 else ( zline * z1 / 100, zline * z2 / 100,zline * z3 / 100,zline, k0_z, k0_angle,  ' , '.join(flags), None,None)
 
     def red670_calculate_elements(self, settings_frame):
         flags = []
@@ -685,7 +694,7 @@ for i in location_data.iterrows():
 
     search_string = str(i[0][1])
 
-    ips = pd.read_hdf(hdf5_path, where=' AssetID = \"{}\"'.format(search_string))
+    ips = pd.read_hdf(hdf5_path, where=' AssetID = search_string')
     print(count,time.perf_counter() - t1)
     t1 = time.perf_counter()
     ips.loc[:, ['Actual']] = ips['Actual'].map(lambda x: enum_dict.get(x, x))
@@ -715,7 +724,7 @@ for i in location_data.iterrows():
 
     count += 1
 
-    if count == 200:
+    if count == 2000:
         break
 
 result_pd.columns = ['Location','Asset Name', 'Relay type', 'Technology', 'Location has no relays', 'Relay placed in incorrect location',

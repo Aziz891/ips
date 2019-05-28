@@ -13,5 +13,6 @@ output.csv
 .idea/
 output_relays.csv
 output_locations.csv
+path_locations.py
 
 
